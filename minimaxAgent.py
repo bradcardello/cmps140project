@@ -9,6 +9,7 @@
 from captureAgents import CaptureAgent
 import random, time, util
 from game import Directions
+from game import Actions
 import game
 from util import nearestPoint
 
@@ -233,70 +234,6 @@ class AlphaBetaCaptureAgent(CaptureAgent):
 
     return random.choice(bestActions)
 
-class EnemyState:
-  """
-  A GameState specifies the full game state, including the food, capsules,
-  agent configurations and score changes.
-
-  GameStates are used by the Game object to capture the actual state of the game and
-  can be used by agents to reason about the game.
-
-  Much of the information in a GameState is stored in a GameStateData object.  We
-  strongly suggest that you access that data via the accessor methods below rather
-  than referring to the GameStateData object directly.
-  """
-
-  ####################################################
-  # Accessor methods: use these to access state data #
-  ####################################################
-
-  def getLegalActions( self, agentIndex=0 ):
-    """
-    Returns the legal actions for the agent specified.
-    """
-    return AgentRules.getLegalActions( self, agentIndex )
-
-  def generateSuccessor( self, agentIndex, action):
-    """
-    Returns the successor state (a GameState object) after the specified agent takes the action.
-    """
-    # Copy current state
-    state = EnemyState(self)
-
-    # Find appropriate rules for the agent
-    AgentRules.applyAction( state, action, agentIndex )
-    AgentRules.checkDeath(state, agentIndex)
-    AgentRules.decrementTimer(state.data.agentStates[agentIndex])
-
-    # Book keeping
-    state.data._agentMoved = agentIndex
-    state.data.score += state.data.scoreChange
-    state.data.timeleft = self.data.timeleft - 1
-    return state
-
-  def getAgentState(self, index):
-    return self.data.agentStates[index]
-
-  def getAgentPosition(self, index):
-    """
-    Returns a location tuple if the agent with the given index is observable;
-    if the agent is unobservable, returns None.
-    """
-    agentState = self.data.agentStates[index]
-    ret = agentState.getPosition()
-    if ret:
-      return tuple(int(x) for x in ret)
-    return ret
-
-  def getNumAgents( self ):
-    return len( self.data.agentStates )
-
-  def getScore( self ):
-    """
-    Returns a number corresponding to the current score.
-    """
-    return self.data.score
-
 class OffensiveAlphaBetaAgent(AlphaBetaCaptureAgent):
   """
   A reflex agent that seeks food. This is an agent
@@ -311,74 +248,37 @@ class OffensiveAlphaBetaAgent(AlphaBetaCaptureAgent):
     prob = 0
     dist = 0
     for i in range(len(noisyDistances)): # 0 to 3
-        # print "opponents for index ", i, "are: ", self.opponents
-        if i in self.opponents:
-            # print "i = ", i
-            # for trueDistance in range(noisyDistances[i] - 6, noisyDistances[i] + 7): # if 0, range is [-6, 6]
-            #     prob = gameState.getDistanceProb(trueDistance, noisyDistances[i])
-            #     print "i = ", i
-            #     print "my team:", self.myTeam
-            #     print "distance = ", noisyDistances[i]
-            #     print "true distance = ", trueDistance
-            #     print "prob = ", prob
-            #     if prob == 1:
-            #         noisyDistances[i] = trueDistance
-            #         print "I found it ya bish"
-            #         break
+        print "my index = ", self.index
+        if (gameState.isOnRedTeam(self.index) and not gameState.isOnRedTeam(i)) or (not gameState.isOnRedTeam(self.index) and gameState.isOnRedTeam(i)):
+            for trueDistance in range(noisyDistances[i] - 6, noisyDistances[i] + 7): # if 0, range is [-6, 6]
+                prob = gameState.getDistanceProb(trueDistance, noisyDistances[i])
+                # print "i = ", i
+                # print "my team:", self.myTeam
+                # print "distance = ", noisyDistances[i]
+                # print "true distance = ", trueDistance
+                # print "prob = ", prob
+                if prob == 1:
+                    noisyDistances[i] = trueDistance
+                    print "I found it ya bish"
+                    break
             if noisyDistances[i] <= 7:
                 dist = noisyDistances[i]
                 enemyNear = True
-                print "ENEMY NEAR YOU FUCK"
+                # print "ENEMY NEAR YOU FUCK"
                 break
 
-    # Create set of possible positions for enemies (PUT IN ENEMYSTATE LATER)
-    possiblePositions = []
     myPos = gameState.getAgentPosition(self.index)
-    isEven = (dist % 2 == 0)
-    i = 0
-    j = dist
-    if isEven:
-        # Loop forwards from 0 to dist/2, while looping backwards from dist to dist/2
-        # By doing this, we make sure to include all possible (x,y) coordinates
-        while (i <= dist / 2) and (j >= dist / 2) :
-            possiblePositions += (self.setUpPositions(gameState, i, j, myPos[0], myPos[1]))
-            i += 1
-            j -= 1
-    else:
-        # A little different if your distance is an odd number, but same concept
-        while (i <= dist / 2) and (j >= dist / 2 + 1):
-            possiblePositions += (self.setUpPositions(gameState, i, j, myPos[0], myPos[1]))
-            i += 1
-            j -= 1
-
-    # print "dist = ", dist
-    # print "possiblePositions: ", possiblePositions
-    # print "possiblePositions length: ", len(possiblePositions)
+    enemyState = EnemyState(gameState, myPos, dist)
 
     # Compute best action if in danger, otherwise, use simple reflex agent action
     action = None
     if enemyNear:
+        print "DOING AlphaBeta"
         action = self.findAlphaBetaAction(gameState)
+        print "FINISHED AlphaBeta"
     else:
         action = self.findReflexAction(gameState)
     return action
-
-  def setUpPositions(self, gameState, i, j, x, y):
-      possiblePositions = []
-      possiblePositions.append( (x + i, y + j) )
-      possiblePositions.append( (x + j, y + i) )
-      possiblePositions.append( (x + i, y - j) )
-      possiblePositions.append( (x - i, y + j) )
-      if (i != 0 and j != 0) and (i != j):
-          possiblePositions.append( (x + j, y - i) )
-          possiblePositions.append( (x - j, y + i) )
-          possiblePositions.append( (x - i, y - j) )
-          possiblePositions.append( (x - j, y - i) )
-      # print "actions are", possiblePositions
-      for pos in possiblePositions:
-          if gameState.hasWall(pos[0], pos[1]):
-              possiblePositions.remove(pos)
-      return possiblePositions
 
   def getFeatures(self, gameState, action):
     features = util.Counter()
@@ -436,3 +336,130 @@ class DefensiveAlphaBetaAgent(AlphaBetaCaptureAgent):
 
   def getWeights(self, gameState, action):
     return {'numInvaders': -1000, 'onDefense': 100, 'invaderDistance': -10, 'stop': -100, 'reverse': -2}
+
+
+class EnemyState:
+  """
+  A GameState specifies the full game state, including the food, capsules,
+  agent configurations and score changes.
+
+  GameStates are used by the Game object to capture the actual state of the game and
+  can be used by agents to reason about the game.
+
+  Much of the information in a GameState is stored in a GameStateData object.  We
+  strongly suggest that you access that data via the accessor methods below rather
+  than referring to the GameStateData object directly.
+  """
+
+  ####################################################
+  # Accessor methods: use these to access state data #
+  ####################################################
+
+  def __init__( self, gameState, myPos, dist ):
+    # Create set of possible positions for enemies (PUT IN ENEMYSTATE LATER)
+    self.possiblePositions = []
+    self.possibleActionsFromPos = util.Counter() # pairs of (possiblePosition, possibleActionsFromPos)
+    self.gameState = gameState
+    self.myPos = myPos
+    self.dist = dist
+    isEven = (dist % 2 == 0)
+    i = 0
+    j = dist
+    middle = dist / 2 if isEven else dist / 2 + 1
+    # Loop forwards from 0 to dist/2, while looping backwards from dist to middle
+    # By doing this, we make sure to include all possible (x,y) coordinates
+    while (i <= dist / 2) and (j >= middle) :
+        self.possiblePositions += (self.setUpPositions(gameState, i, j, myPos[0], myPos[1]))
+        i += 1
+        j -= 1
+
+    self.possibleActionsFromPos = self.setUpPossibleActions(gameState, self.possiblePositions)
+
+    # print "dist = ", dist
+    # print "possiblePositions: ", self.possiblePositions
+    # print "possiblePositions length: ", len(self.possiblePositions)
+
+  def setUpPositions(self, gameState, i, j, x, y):
+    possiblePositions = []
+    possiblePositions.append( (x + i, y + j) )
+    possiblePositions.append( (x + j, y + i) )
+    possiblePositions.append( (x + i, y - j) )
+    possiblePositions.append( (x - i, y + j) )
+    if (i != 0 and j != 0) and (i != j):
+        possiblePositions.append( (x + j, y - i) )
+        possiblePositions.append( (x - j, y + i) )
+        possiblePositions.append( (x - i, y - j) )
+        possiblePositions.append( (x - j, y - i) )
+    # print "actions are", possiblePositions
+    for pos in possiblePositions:
+        if gameState.hasWall(pos[0], pos[1]):
+            possiblePositions.remove(pos)
+    return possiblePositions
+
+  def setUpPossibleActions(self, gameState, possiblePositions):
+      possibleActionsFromPos = util.Counter()
+      for pos in possiblePositions:
+          possibleActionsFromPos[pos] = self.getPossibleActions(gameState, pos)
+          print "From position ", pos, " you can move ", possibleActionsFromPos[pos]
+      return possibleActionsFromPos
+
+  def getPossibleActions(gameState, config):
+    possible = []
+    # print config
+    x, y = config
+    x_int, y_int = int(x + 0.5), int(y + 0.5)
+
+    # In between grid points, all agents must continue straight
+    if (abs(x - x_int) + abs(y - y_int)  > .001):
+      return [config.getDirection()]
+
+    for dir, vec in Actions._directionsAsList:
+      dx, dy = vec
+      next_y = y_int + dy
+      next_x = x_int + dx
+      if not gameState.hasWall(next_x, next_y): possible.append(dir)
+
+    return possible
+
+  getPossibleActions = staticmethod(getPossibleActions)
+
+  def generateSuccessor( self, agentIndex, action):
+    """
+    Returns the successor state (an EnemyState object) after the specified agent takes the action.
+    """
+    # Copy current state
+    state = EnemyState(self)
+
+    # Find appropriate rules for the agent
+    AgentRules.applyAction( state, action, agentIndex )
+    AgentRules.checkDeath(state, agentIndex)
+    AgentRules.decrementTimer(state.data.agentStates[agentIndex])
+
+    # Book keeping
+    state.data._agentMoved = agentIndex
+    state.data.score += state.data.scoreChange
+    state.data.timeleft = self.data.timeleft - 1
+    return state
+
+  def getAgentState(self, index):
+    return self.data.agentStates[index]
+
+  def getAgentPosition(self, index):
+    """
+    Returns a location tuple if the agent with the given index is observable;
+    if the agent is unobservable, returns None.
+    """
+    agentState = self.data.agentStates[index]
+    ret = agentState.getPosition()
+    if ret:
+      return tuple(int(x) for x in ret)
+    return ret
+
+  def getNumAgents( self ):
+    return len( self.data.agentStates )
+
+  def getScore( self ):
+    """
+    Returns a number corresponding to the current score.
+    """
+    return self.data.score
