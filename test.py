@@ -135,7 +135,7 @@ class AlphaBetaCaptureAgent(CaptureAgent):
 
   def findAlphaBetaAction(self, gameState, enemyState):
       # called recursively in minValue()
-      def maxValue(gameState, depth, evaluation, remainingAgents, alpha, beta):
+      def maxValue(gameState, enemyState, depth, evaluation, remainingAgents, alpha, beta):
           # depth == 0 means the bottom of the tree (just a reminder to myself)
           isTerminal = (depth == 0 or gameState.isOver())
 
@@ -156,28 +156,43 @@ class AlphaBetaCaptureAgent(CaptureAgent):
           print "Index to be popped: ", agentIndex
           remainingAgents.remove(agentIndex)
           print "remaining agents after being popped: ", remainingAgents
-          for a in gameState.getLegalActions(agentIndex):
-              evaluation = self.evaluate(gameState, a)
-              if agentIndex in self.opponents:
-                  v = max(v, minValue(enemyState.generateSuccessor(agentIndex, a), depth - 1, evaluation, remainingAgents, alpha, beta))
-              elif agentIndex in self.myTeam:
-                  v = max(v, maxValue(gameState.generateSuccessor(agentIndex, a), depth - 1, evaluation, remainingAgents, alpha, beta))
-              if v >= beta:
-                  return v
-              alpha = max(alpha, v)
+
+
+          if agentIndex in self.opponents:
+              for a in enemyState.getPossibleActions(gameState, enemyState, enemyState.getAgentPosition(agentIndex)):
+                  evaluation = self.evaluate(gameState, a)
+                  v = max(v, minValue(enemyState.generateSuccessor(agentIndex, a), enemyState, depth - 1, evaluation, remainingAgents, alpha, beta))
+                  if v >= beta:
+                      return v
+                  alpha = max(alpha, v)
+          elif agentIndex in self.myTeam:
+              for a in gameState.getLegalActions(agentIndex):
+                  evaluation = self.evaluate(gameState, a)
+                  v = max(v, maxValue(gameState.generateSuccessor(agentIndex, a), enemyState, depth - 1, evaluation, remainingAgents, alpha, beta))
+                  if v >= beta:
+                      return v
+                  alpha = max(alpha, v)
+
+
+
+        #   for a in gameState.getLegalActions(agentIndex):
+        #       evaluation = self.evaluate(gameState, a)
+        #       if agentIndex in self.opponents:
+        #           v = max(v, minValue(enemyState.generateSuccessor(agentIndex, a), enemyState, depth - 1, evaluation, remainingAgents, alpha, beta))
+        #       elif agentIndex in self.myTeam:
+        #           v = max(v, maxValue(gameState.generateSuccessor(agentIndex, a), enemyState, depth - 1, evaluation, remainingAgents, alpha, beta))
+        #       if v >= beta:
+        #           return v
+        #       alpha = max(alpha, v)
 
           return v
 
       # called recursively in maxValue()
-      def minValue(gameState, depth, evaluation, remainingAgents, alpha, beta):
-          # depth == 0 means the bottom of the tree
-          isTerminal = (depth == 0 or gameState.isOver())
-
+      def minValue(gameState, enemyState, depth, evaluation, remainingAgents, alpha, beta):
           # if you've reached a terminal state, calculate score
+          isTerminal = (depth == 0 or gameState.isOver())
           if isTerminal:
               return evaluation
-
-          # v = infinity
           v = float("inf")
 
           # Now we loop over the set of legal actions we can take for this state
@@ -188,16 +203,34 @@ class AlphaBetaCaptureAgent(CaptureAgent):
           print "Index to be popped: ", agentIndex
           remainingAgents.remove(agentIndex)
           print "remaining agents after being popped: ", remainingAgents
-          for a in enemyState.getPossibleActions(gameState, gameState.getAgentPosition(agentIndex)):
-              evaluation = self.evaluate(gameState, a)
-              if agentIndex in self.opponents:
-                  v = min(v, minValue(enemyState.generateSuccessor(agentIndex, a), depth - 1, evaluation, remainingAgents, alpha, beta))
-                  # print gameState.generateSuccessor(agentIndex, a)
-              elif agentIndex in self.myTeam:
-                  v = min(v, maxValue(gameState.generateSuccessor(agentIndex, a), depth - 1, evaluation, remainingAgents, alpha, beta))
-              if v <= alpha:
-                  return v
-              beta = min(beta, v)
+          print "Enemy position is ", enemyState.getAgentPosition(agentIndex)
+
+          if agentIndex in self.opponents:
+              for a in enemyState.getPossibleActions(gameState, enemyState, enemyState.getAgentPosition(agentIndex)):
+                  evaluation = self.evaluate(gameState, a)
+                  v = min(v, minValue(enemyState.generateSuccessor(agentIndex, a), enemyState, depth - 1, evaluation, remainingAgents, alpha, beta))
+                  if v <= alpha:
+                      return v
+                  beta = min(beta, v)
+          elif agentIndex in self.myTeam:
+              for a in gameState.getLegalActions(agentIndex):
+                  evaluation = self.evaluate(gameState, a)
+                  v = min(v, maxValue(gameState.generateSuccessor(agentIndex, a), enemyState, depth - 1, evaluation, remainingAgents, alpha, beta))
+                  if v <= alpha:
+                      return v
+                  beta = min(beta, v)
+
+
+        # for a in enemyState.getPossibleActions(gameState, enemyState, enemyState.getAgentPosition(agentIndex)):
+        #       evaluation = self.evaluate(gameState, a)
+        #       if agentIndex in self.opponents:
+        #           v = min(v, minValue(enemyState.generateSuccessor(agentIndex, a), enemyState, depth - 1, evaluation, remainingAgents, alpha, beta))
+        #           # print gameState.generateSuccessor(agentIndex, a)
+        #       elif agentIndex in self.myTeam:
+        #           v = min(v, maxValue(gameState.generateSuccessor(agentIndex, a), enemyState, depth - 1, evaluation, remainingAgents, alpha, beta))
+        #       if v <= alpha:
+        #           return v
+        #       beta = min(beta, v)
 
           return v
 
@@ -205,13 +238,13 @@ class AlphaBetaCaptureAgent(CaptureAgent):
       utility = alpha = -(float("inf"))
       beta = float("inf")
       for a in gameState.getLegalActions(self.index):
-          remainingAgents = self.agentIndices
+          remainingAgents = self.agentIndices # pass this in as list of defenders
           remainingAgents.pop(self.index)
           nextState = gameState.generateSuccessor(self.index, a)
           lastScore = utility
           # Recursively determine the maximimum utility possible for Pacman!
           evaluation = self.evaluate(gameState, a)
-          utility = max(utility, minValue(nextState, self.treeDepth, evaluation, remainingAgents, alpha, beta))
+          utility = max(utility, minValue(nextState, enemyState, self.treeDepth, evaluation, remainingAgents, alpha, beta))
           if utility > lastScore:
               optimalAction = a
 
@@ -244,42 +277,40 @@ class OffensiveAlphaBetaAgent(AlphaBetaCaptureAgent):
   """
 
   def chooseAction(self, gameState):
-    # Compute whether enemy is close or not
-    noisyDistances = gameState.getAgentDistances()
-    enemyNear = False
-    prob = 0
-    dist = 0
-    for i in range(len(noisyDistances)): # 0 to 3
-        print "my index = ", self.index
-        if (gameState.isOnRedTeam(self.index) and not gameState.isOnRedTeam(i)) or (not gameState.isOnRedTeam(self.index) and gameState.isOnRedTeam(i)):
-            for trueDistance in range(noisyDistances[i] - 6, noisyDistances[i] + 7): # if 0, range is [-6, 6]
-                prob = gameState.getDistanceProb(trueDistance, noisyDistances[i])
-                # print "i = ", i
-                # print "my team:", self.myTeam
-                # print "distance = ", noisyDistances[i]
-                # print "true distance = ", trueDistance
-                # print "prob = ", prob
-                if prob == 1:
-                    noisyDistances[i] = trueDistance
-                    print "I found it ya bish"
-                    break
-            if noisyDistances[i] <= 7:
-                dist = noisyDistances[i]
-                enemyNear = True
-                # print "ENEMY NEAR YOU FUCK"
-                break
+    enemies = util.Counter()
+    enemyPositions = util.Counter()
+    defenders = []
+    # link enemy indices to their AgentStates
+    for i in self.getOpponents(gameState):
+        print "Enemy index is ", i
+        enemies[i] = gameState.getAgentState(i)
+        if not enemies[i].isPacman and enemies[i].getPosition() != None:
+            enemyPositions[i] = enemies[i].getPosition()
+            defenders.append(enemies[i])
+    # for i in self.getOpponents(gameState)):
+        # if not enemies[i].isPacman and enemies[i].getPosition() != None:
+        #     defenders.append(enemies[i])
+    print "Defenders are ", defenders
 
-    myPos = gameState.getAgentPosition(self.index)
-    enemyState = EnemyState(gameState, myPos, dist)
+    # enemies = [gameState.getAgentState(i) for i in self.getOpponents(gameState)]
+    # defenders = [a for a in enemies if not a.isPacman and a.getPosition() != None]
 
     # Compute best action if in danger, otherwise, use simple reflex agent action
     action = None
-    if enemyNear:
-        print "DOING AlphaBeta"
-        action = self.findAlphaBetaAction(gameState, enemyState)
-        print "FINISHED AlphaBeta"
+    if len(defenders) > 0:
+      myAgentState = gameState.getAgentState(self.index)
+      myPos = myAgentState.getPosition()
+      defenderDists = util.Counter()
+      for a in defenders:
+        defenderDists[a] = self.getMazeDistance(myPos, a.getPosition())
+      print "DOING AlphaBeta"
+      enemyState = EnemyState(gameState, a.getPosition(), defenders, defenderDists, enemyPositions)
+      "The enemy state is ", enemyState
+      action = self.findAlphaBetaAction(gameState, enemyState)
+      print "FINISHED AlphaBeta"
+      print "Defenders distances are ", dists
     else:
-        action = self.findReflexAction(gameState)
+      action = self.findReflexAction(gameState)
     return action
 
   def getFeatures(self, gameState, action):
@@ -293,10 +324,16 @@ class OffensiveAlphaBetaAgent(AlphaBetaCaptureAgent):
       myPos = successor.getAgentState(self.index).getPosition()
       minDistance = min([self.getMazeDistance(myPos, food) for food in foodList])
       features['distanceToFood'] = minDistance
+
+    enemies = [gameState.getAgentState(i) for i in self.getOpponents(gameState)]
+    defenders = [a for a in enemies if not a.isPacman and a.getPosition() != None]
+    if len(defenders) > 0:
+      dists = [self.getMazeDistance(myPos, a.getPosition()) for a in defenders]
+      features['defenderDistance'] = min(dists)
     return features
 
   def getWeights(self, gameState, action):
-    return {'successorScore': 100, 'distanceToFood': -1}
+    return {'successorScore': 100, 'distanceToFood': -1, 'defenderDistance': -10}
 
 
 class DefensiveAlphaBetaAgent(AlphaBetaCaptureAgent):
@@ -357,47 +394,13 @@ class EnemyState:
   # Accessor methods: use these to access state data #
   ####################################################
 
-  def __init__( self, gameState, myPos, dist ):
-    # Create set of possible positions for enemies (PUT IN ENEMYSTATE LATER)
-    self.possiblePositions = []
-    self.possibleActionsFromPos = util.Counter() # pairs of (possiblePosition, possibleActionsFromPos)
+  def __init__( self, gameState, myPos, enemies, enemyDists, enemyPositions ):
     self.gameState = gameState
     self.myPos = myPos
-    self.dist = dist
-    isEven = (dist % 2 == 0)
-    i = 0
-    j = dist
-    middle = dist / 2 if isEven else dist / 2 + 1
-    # Loop forwards from 0 to dist/2, while looping backwards from dist to middle
-    # By doing this, we make sure to include all possible (x,y) coordinates
-    while (i <= dist / 2) and (j >= middle) :
-        self.possiblePositions += (self.setUpPositions(gameState, i, j, myPos[0], myPos[1]))
-        i += 1
-        j -= 1
+    self.enemies = enemies # Counter with (agentIndex, AgentState) pairs
+    self.enemyDists = enemyDists # Counter with (AgentState, distFromMyPos) pairs
+    self.enemyPositions = enemyPositions # Counter with (agentIndex, position) pairs
 
-    self.possibleActionsFromPos = self.setUpPossibleActions(gameState, self.possiblePositions)
-
-    # print "dist = ", dist
-    # print "possiblePositions: ", self.possiblePositions
-    # print "possiblePositions length: ", len(self.possiblePositions)
-
-  def setUpPositions(self, gameState, i, j, x, y):
-    possiblePositions = []
-    possiblePositions.append( (x + i, y + j) )
-    possiblePositions.append( (x + j, y + i) )
-    possiblePositions.append( (x + i, y - j) )
-    possiblePositions.append( (x - i, y + j) )
-    if (i != 0 and j != 0) and (i != j):
-        possiblePositions.append( (x + j, y - i) )
-        possiblePositions.append( (x - j, y + i) )
-        possiblePositions.append( (x - i, y - j) )
-        possiblePositions.append( (x - j, y - i) )
-    # print "actions are", possiblePositions
-    for pos in possiblePositions:
-        outOfBounds = pos[0] > Grid.deepCopy().width or pos[1] > Grid.deepCopy().height
-        if gameState.hasWall(pos[0], pos[1]) or outOfBounds:
-            possiblePositions.remove(pos)
-    return possiblePositions
 
   def setUpPossibleActions(self, gameState, possiblePositions):
       possibleActionsFromPos = util.Counter()
@@ -406,7 +409,7 @@ class EnemyState:
           print "From position ", pos, " you can move ", possibleActionsFromPos[pos]
       return possibleActionsFromPos
 
-  def getPossibleActions(gameState, config):
+  def getPossibleActions(gameState, enemyState, config):
     possible = []
     print "config = ", config
     x = config[0]
@@ -432,11 +435,11 @@ class EnemyState:
     Returns the successor state (an EnemyState object) after the specified agent takes the action.
     """
     # Copy current state
-    state = EnemyState(self.gameState, self.myPos, self.dist )
+    state = EnemyState(self.gameState, self.myPos, self.enemies, self.enemyDists, self.enemyPositions  )
 
     # Find appropriate rules for the agent
-    AgentRules.applyAction( state, action, agentIndex )
-    AgentRules.checkDeath(state, agentIndex)
+    # AgentRules.applyAction( state, action, agentIndex )
+    # AgentRules.checkDeath(state, agentIndex)
 
     # Book keeping
     # state.data._agentMoved = agentIndex
@@ -445,18 +448,10 @@ class EnemyState:
     return state
 
   def getAgentState(self, index):
-    return self.data.agentStates[index]
+    return self.enemies[index]
 
   def getAgentPosition(self, index):
-    """
-    Returns a location tuple if the agent with the given index is observable;
-    if the agent is unobservable, returns None.
-    """
-    agentState = self.data.agentStates[index]
-    ret = agentState.getPosition()
-    if ret:
-      return tuple(int(x) for x in ret)
-    return ret
+    return self.enemyPositions[index]
 
   def getNumAgents( self ):
     return len( self.data.agentStates )
